@@ -1,4 +1,4 @@
-build:
+build: clean
 	npx parcel build
 
 clean:

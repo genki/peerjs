@@ -3,6 +3,7 @@ import type { Peer } from "../../peer.js";
 import { DataConnection } from "../DataConnection.js";
 
 export abstract class StreamConnection extends DataConnection {
+  private ondatachannelinit: () => void;
 	private _CHUNK_SIZE = 1024 * 8 * 4;
 	private _splitStream = new TransformStream<Uint8Array>({
 		transform: (chunk, controller) => {
@@ -13,6 +14,11 @@ export abstract class StreamConnection extends DataConnection {
 	});
 	private _rawSendStream = new WritableStream<ArrayBuffer>({
 		write: async (chunk, controller) => {
+      await new Promise<void>((resolve) => {
+        if (!this.dataChannel) {
+          this.ondatachannelinit = resolve;
+        } else resolve();
+      });
 			const openEvent = new Promise((resolve) =>
 				this.dataChannel.addEventListener("bufferedamountlow", resolve, {
 					once: true,
@@ -54,6 +60,13 @@ export abstract class StreamConnection extends DataConnection {
 
 	public override _initializeDataChannel(dc) {
 		super._initializeDataChannel(dc);
+    if (this.ondatachannelinit) {
+      dc.on("readystatechange", () => {
+        if (dc.readyState === "open") {
+          this.ondatachannelinit();
+        }
+      });
+    }
 		this.dataChannel.binaryType = "arraybuffer";
 		this.dataChannel.bufferedAmountLowThreshold =
 			DataConnection.MAX_BUFFERED_AMOUNT / 2;

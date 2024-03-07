@@ -20,20 +20,19 @@ export class Socket extends EventEmitter {
 		host: string,
 		port: number,
 		path: string,
-		key: string,
 		private readonly pingInterval: number = 5000,
 	) {
 		super();
 
 		const wsProtocol = secure ? "wss://" : "ws://";
 
-		this._baseUrl = wsProtocol + host + ":" + port + path + "peerjs?key=" + key;
+		this._baseUrl = wsProtocol + host + ":" + port + path + "peerjs";
 	}
 
-	start(id: string, token: string): void {
+	start(id: string, token: string, key: string): void {
 		this._id = id;
 
-		const wsUrl = `${this._baseUrl}&id=${id}&token=${token}`;
+		const wsUrl = `${this._baseUrl}?id=${id}&token=${token}&key=${key}`;
 
 		if (!!this._socket || !this._disconnected) {
 			return;

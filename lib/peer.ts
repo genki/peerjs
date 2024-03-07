@@ -43,7 +43,6 @@ class PeerOptions implements PeerJSOption {
 	/**
 	 * API key for the PeerServer.
 	 * This is not used anymore.
-	 * @deprecated
 	 */
 	key?: string;
 	token?: string;
@@ -304,7 +303,6 @@ export class Peer extends EventEmitterWithError<PeerErrorType, PeerEvents> {
 			this._options.host!,
 			this._options.port!,
 			this._options.path!,
-			this._options.key!,
 			this._options.pingInterval,
 		);
 
@@ -342,7 +340,7 @@ export class Peer extends EventEmitterWithError<PeerErrorType, PeerEvents> {
 	/** Initialize a connection with the server. */
 	private _initialize(id: string): void {
 		this._id = id;
-		this.socket.start(id, this._options.token!);
+		this.socket.start(id, this._options.token!, this._options.key);
 	}
 
 	/** Handles messages from the server. */

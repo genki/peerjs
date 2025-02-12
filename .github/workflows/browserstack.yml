@@ -24,7 +24,7 @@ jobs:
       # The next 3 steps are for building the web application to be tested and starting the web server on the runner environment
 
       - name: "Checkout the repository"
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: "Building web application to be tested"
         run: npm install && npm run build
@@ -34,6 +34,8 @@ jobs:
 
       - name: "Running test on BrowserStack" # Invokes the actual test script that would run on BrowserStack browsers
         run: npm run e2e:bstack # See sample test script above
+        env:
+          BYPASS_WAF: ${{ secrets.BYPASS_WAF }}
 
       - name: "BrowserStackLocal Stop" # Terminating the BrowserStackLocal tunnel connection
         uses: browserstack/github-actions/setup-local@master

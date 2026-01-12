@@ -12,6 +12,8 @@ permissions:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    env:
+      NODE_AUTH_TOKEN: ""
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -20,13 +22,7 @@ jobs:
           registry-url: "https://registry.npmjs.org"
       - name: Install
         run: npm ci
-      - name: Update npm
-        run: |
-          npm install -g npm@latest
-          npm --version
       - name: Publish
-        env:
-          NODE_AUTH_TOKEN: ""
         run: |
           npm config delete //registry.npmjs.org/:_authToken || true
           npm config delete _authToken || true

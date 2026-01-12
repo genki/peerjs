@@ -1,6 +1,6 @@
 {
-	"name": "peerjs",
-	"version": "1.5.4",
+	"name": "@s21g/peerjs",
+	"version": "1.5.4-1",
 	"keywords": [
 		"peerjs",
 		"webrtc",

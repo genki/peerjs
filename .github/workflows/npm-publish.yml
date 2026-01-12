@@ -21,8 +21,6 @@ jobs:
       - name: Install
         run: npm ci
       - name: Publish
-        env:
-          NODE_AUTH_TOKEN: ""
         run: |
           VERSION=$(node -p "require('./package.json').version")
           if echo "$VERSION" | grep -q "-"; then

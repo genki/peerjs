@@ -6,45 +6,73 @@ const writeText = async (path, text) => await fs.writeFile(path, text, "utf8");
 const stripSourceMappingURL = (text) =>
   text.replace(/\n+\/\/# sourceMappingURL.*$/m, "");
 
-const replaceOnce = (text, from, to, label) => {
+const replaceAllText = (text, from, to, label) => {
   if (!text.includes(from)) return {changed: false, text};
-  const out = text.replace(from, to);
+  const out = text.replaceAll(from, to);
   if (out === text) throw new Error(`[patch-dist] 置換に失敗: ${label}`);
   return {changed: true, text: out};
 };
 
 const patchPeerjs = (text) => {
   let out = text;
-  const r0 = replaceOnce(
+  const r0 = replaceAllText(
     out,
     "_bufferBuilder.append(192)",
     "_bufferBuilder.append(193)",
     "peerjs nil->ext",
   );
   out = r0.text;
-  const r1 = replaceOnce(
+  const r1 = replaceAllText(
     out,
     "this._bufferBuilder.append(192)",
     "this._bufferBuilder.append(193)",
     "peerjs nil->ext(this)",
   );
   out = r1.text;
+  const r2 = replaceAllText(
+    out,
+    "_bufferBuilder.append(0xc0)",
+    "_bufferBuilder.append(0xc1)",
+    "peerjs nil->ext(hex)",
+  );
+  out = r2.text;
+  const r3 = replaceAllText(
+    out,
+    "this._bufferBuilder.append(0xc0)",
+    "this._bufferBuilder.append(0xc1)",
+    "peerjs nil->ext(this hex)",
+  );
+  out = r3.text;
   out = stripSourceMappingURL(out);
   return out;
 };
 
 const patchMsgpackSerializer = (text) => {
   let out = text;
-  const r = replaceOnce(
+  const eePatched =
+    "_encoder=new ee(void 0,void 0,void 0,void 0,void 0,void 0,true)";
+  const fPatched =
+    "_encoder=new F(void 0,void 0,void 0,void 0,void 0,void 0,true)";
+  if (out.includes(eePatched) || out.includes(fPatched)) {
+    return stripSourceMappingURL(out);
+  }
+  const r0 = replaceAllText(
     out,
     "_encoder=new ee",
-    "_encoder=new ee(void 0,void 0,void 0,void 0,void 0,void 0,true)",
-    "serializer encoder opt",
+    eePatched,
+    "serializer encoder opt(ee)",
   );
-  if (!r.changed) {
+  out = r0.text;
+  const r1 = replaceAllText(
+    out,
+    "_encoder=new F",
+    fPatched,
+    "serializer encoder opt(F)",
+  );
+  out = r1.text;
+  if (!r0.changed && !r1.changed) {
     throw new Error("[patch-dist] 対象文字列が見つかりません: MsgPack設定");
   }
-  out = r.text;
   out = stripSourceMappingURL(out);
   return out;
 };

@@ -4,6 +4,7 @@ import { DataConnection } from "../DataConnection.js";
 
 export abstract class StreamConnection extends DataConnection {
 	private _CHUNK_SIZE = 1024 * 8 * 4;
+	private _bufferedAmountLowWait: Promise<void> | null = null;
 	private _splitStream = new TransformStream<Uint8Array>({
 		transform: (chunk, controller) => {
 			for (let split = 0; split < chunk.length; split += this._CHUNK_SIZE) {
@@ -13,16 +14,12 @@ export abstract class StreamConnection extends DataConnection {
 	});
 	private _rawSendStream = new WritableStream<ArrayBuffer>({
 		write: async (chunk, controller) => {
-			const openEvent = new Promise((resolve) =>
-				this.dataChannel.addEventListener("bufferedamountlow", resolve, {
-					once: true,
-				}),
-			);
-
 			// if we can send the chunk now, send it
 			// if not, we wait until at least half of the sending buffer is free again
-			await (this.dataChannel.bufferedAmount <=
-				DataConnection.MAX_BUFFERED_AMOUNT - chunk.byteLength || openEvent);
+			const needWait =
+				this.dataChannel.bufferedAmount >
+				DataConnection.MAX_BUFFERED_AMOUNT - chunk.byteLength;
+			if (needWait) await this._waitForBufferedAmountLow();
 
 			// TODO: what can go wrong here?
 			try {
@@ -50,6 +47,31 @@ export abstract class StreamConnection extends DataConnection {
 		super(peerId, provider, { ...options, reliable: true });
 
 		void this._splitStream.readable.pipeTo(this._rawSendStream);
+	}
+
+	private _waitForBufferedAmountLow(): Promise<void> {
+		if (this._bufferedAmountLowWait) return this._bufferedAmountLowWait;
+		const dc = this.dataChannel;
+		this._bufferedAmountLowWait = new Promise((resolve) => {
+			let done = false;
+			const finish = () => {
+				if (done) return;
+				done = true;
+				this._bufferedAmountLowWait = null;
+				resolve();
+			};
+			const onLow = () => finish();
+			dc.addEventListener("bufferedamountlow", onLow, { once: true });
+			this.once("close", () => {
+				try {
+					dc.removeEventListener("bufferedamountlow", onLow);
+				} catch {
+					// 無視する。
+				}
+				finish();
+			});
+		});
+		return this._bufferedAmountLowWait;
 	}
 
 	public override _initializeDataChannel(dc) {

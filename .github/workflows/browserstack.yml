@@ -7,15 +7,33 @@ jobs:
   ubuntu-job:
     name: "BrowserStack Test on Ubuntu"
     runs-on: ubuntu-latest # Can be self-hosted runner also
-    if: ${{ secrets.BROWSERSTACK_USERNAME != '' && secrets.BROWSERSTACK_ACCESS_KEY != '' }}
     steps:
+      - name: "Check BrowserStack secrets"
+        id: bstack
+        run: |
+          if [ -z "${{ secrets.BROWSERSTACK_USERNAME }}" ]; then
+            echo "enabled=0" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ -z "${{ secrets.BROWSERSTACK_ACCESS_KEY }}" ]; then
+            echo "enabled=0" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "enabled=1" >> "$GITHUB_OUTPUT"
+
+      - name: "Skip BrowserStack tests"
+        if: steps.bstack.outputs.enabled != '1'
+        run: echo "BrowserStack secrets are missing, skip."
+
       - name: "BrowserStack Env Setup" # Invokes the setup-env action
+        if: steps.bstack.outputs.enabled == '1'
         uses: browserstack/github-actions/setup-env@master
         with:
           username: ${{ secrets.BROWSERSTACK_USERNAME }}
           access-key: ${{ secrets.BROWSERSTACK_ACCESS_KEY }}
 
       - name: "BrowserStack Local Tunnel Setup" # Invokes the setup-local action
+        if: steps.bstack.outputs.enabled == '1'
         uses: browserstack/github-actions/setup-local@master
         with:
           local-testing: "start"
@@ -25,20 +43,25 @@ jobs:
       # The next 3 steps are for building the web application to be tested and starting the web server on the runner environment
 
       - name: "Checkout the repository"
+        if: steps.bstack.outputs.enabled == '1'
         uses: actions/checkout@v4
 
       - name: "Building web application to be tested"
+        if: steps.bstack.outputs.enabled == '1'
         run: npm install && npm run build
 
       - name: "Running application under test"
+        if: steps.bstack.outputs.enabled == '1'
         run: npx http-server -p 3000 --cors &
 
       - name: "Running test on BrowserStack" # Invokes the actual test script that would run on BrowserStack browsers
+        if: steps.bstack.outputs.enabled == '1'
         run: npm run e2e:bstack # See sample test script above
         env:
           BYPASS_WAF: ${{ secrets.BYPASS_WAF }}
 
       - name: "BrowserStackLocal Stop" # Terminating the BrowserStackLocal tunnel connection
+        if: steps.bstack.outputs.enabled == '1'
         uses: browserstack/github-actions/setup-local@master
         with:
           local-testing: "stop"

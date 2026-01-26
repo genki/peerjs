@@ -78,4 +78,33 @@ describe("StreamConnection bufferedamountlow", () => {
       ).length,
     ).toBe(0);
   });
+
+  it("close後のwriteはTypeErrorにならない", async () => {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const {StreamConnection} = require(
+      "../lib/dataconnection/StreamConnection/StreamConnection",
+    );
+
+    class TestConn extends StreamConnection {
+      serialization = "test";
+      constructor() {
+        super("peer", fakeProvider(), {});
+      }
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      protected _send(_data: any, _chunked: boolean) {}
+    }
+
+    const conn = new TestConn();
+    const dc = new FakeDataChannel();
+    // @ts-ignore
+    conn._initializeDataChannel(dc);
+    // @ts-ignore
+    dc.onopen?.();
+
+    conn.close();
+
+    const p = (conn as any).writer.write(new Uint8Array(1024));
+    await expect(p).resolves.toBeUndefined();
+    expect(dc.send.mock.calls.length).toBe(0);
+  });
 });

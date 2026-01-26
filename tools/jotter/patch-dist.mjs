@@ -15,6 +15,13 @@ export const replaceAllText = (text, from, to, label) => {
   return {changed: true, text: out};
 };
 
+export const replaceReText = (text, re, to, label) => {
+  if (!re.test(text)) return {changed: false, text};
+  const out = text.replace(re, to);
+  if (out === text) throw new Error(`[patch-dist] 置換に失敗: ${label}`);
+  return {changed: true, text: out};
+};
+
 export const patchPeerjsText = (text) => {
   let out = text;
   const r0 = replaceAllText(
@@ -55,9 +62,12 @@ export const patchMsgpackSerializerText = (text) => {
     "_encoder=new ee(void 0,void 0,void 0,void 0,void 0,void 0,true)";
   const fPatched =
     "_encoder=new F(void 0,void 0,void 0,void 0,void 0,void 0,true)";
+  const anyPatched =
+    /_encoder=new [A-Za-z_$][\w$]*\(void 0,void 0,void 0,void 0,void 0,void 0,true\)/;
   if (out.includes(eePatched) || out.includes(fPatched)) {
     return stripSourceMappingURL(out);
   }
+  if (anyPatched.test(out)) return stripSourceMappingURL(out);
   const r0 = replaceAllText(
     out,
     "_encoder=new ee",
@@ -72,7 +82,14 @@ export const patchMsgpackSerializerText = (text) => {
     "serializer encoder opt(F)",
   );
   out = r1.text;
-  if (!r0.changed && !r1.changed) {
+  const r2 = replaceReText(
+    out,
+    /(\b(?:this\.)?_encoder=new )([A-Za-z_$][\w$]*)(?=[,;])/,
+    "$1$2(void 0,void 0,void 0,void 0,void 0,void 0,true)",
+    "serializer encoder opt(any)",
+  );
+  out = r2.text;
+  if (!r0.changed && !r1.changed && !r2.changed) {
     throw new Error("[patch-dist] 対象文字列が見つかりません: MsgPack設定");
   }
   out = stripSourceMappingURL(out);

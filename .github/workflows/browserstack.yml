@@ -7,6 +7,7 @@ jobs:
   ubuntu-job:
     name: "BrowserStack Test on Ubuntu"
     runs-on: ubuntu-latest # Can be self-hosted runner also
+    if: ${{ secrets.BROWSERSTACK_USERNAME != '' && secrets.BROWSERSTACK_ACCESS_KEY != '' }}
     steps:
       - name: "BrowserStack Env Setup" # Invokes the setup-env action
         uses: browserstack/github-actions/setup-env@master

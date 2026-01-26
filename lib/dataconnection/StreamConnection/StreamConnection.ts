@@ -58,8 +58,7 @@ export abstract class StreamConnection extends DataConnection {
 	protected constructor(peerId: string, provider: Peer, options: any) {
 		super(peerId, provider, { ...options, reliable: true });
 
-		void this._splitStream.readable.pipeTo(this._rawSendStream)
-			.catch(() => {});
+		void this._splitStream.readable.pipeTo(this._rawSendStream).catch(() => {});
 	}
 
 	private _waitForBufferedAmountLow(): Promise<void> {

@@ -13,9 +13,8 @@ export abstract class BufferedConnection extends DataConnection {
 	public override _initializeDataChannel(dc: RTCDataChannel) {
 		super._initializeDataChannel(dc);
 		this.dataChannel.binaryType = "arraybuffer";
-		this.dataChannel.addEventListener("message", (e) =>
-			this._handleDataMessage(e),
-		);
+		// DataConnection.closeで確実に解除できるようonmessageを使う。
+		this.dataChannel.onmessage = (e) => this._handleDataMessage(e);
 	}
 
 	protected abstract _handleDataMessage(e: MessageEvent): void;

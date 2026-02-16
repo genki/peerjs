@@ -5,6 +5,10 @@ import { DataConnection } from "../DataConnection.js";
 export abstract class StreamConnection extends DataConnection {
 	private _CHUNK_SIZE = 1024 * 8 * 4;
 	private _bufferedAmountLowWait: Promise<void> | null = null;
+	private _rawReadController:
+		| ReadableStreamDefaultController<ArrayBuffer>
+		| null = null;
+	private _rawReadOnOpen: (() => void) | null = null;
 	private _splitStream = new TransformStream<Uint8Array>({
 		transform: (chunk, controller) => {
 			for (let split = 0; split < chunk.length; split += this._CHUNK_SIZE) {
@@ -47,11 +51,23 @@ export abstract class StreamConnection extends DataConnection {
 
 	protected _rawReadStream = new ReadableStream<ArrayBuffer>({
 		start: (controller) => {
-			this.once("open", () => {
-				this.dataChannel.addEventListener("message", (e) => {
-					controller.enqueue(e.data);
-				});
-			});
+			this._rawReadController = controller;
+			const onOpen = () => {
+				const dc = this.dataChannel;
+				if (!dc) return;
+				dc.onmessage = (e) => {
+					try {
+						controller.enqueue(e.data);
+					} catch {
+						// 無視する。
+					}
+				};
+			};
+			this._rawReadOnOpen = onOpen;
+			this.once("open", onOpen);
+		},
+		cancel: () => {
+			this._rawReadController = null;
 		},
 	});
 
@@ -92,5 +108,28 @@ export abstract class StreamConnection extends DataConnection {
 		this.dataChannel.binaryType = "arraybuffer";
 		this.dataChannel.bufferedAmountLowThreshold =
 			DataConnection.MAX_BUFFERED_AMOUNT / 2;
+	}
+
+	public override close(options?: { flush?: boolean }): void {
+		if (options?.flush) {
+			super.close(options);
+			return;
+		}
+
+		super.close(options);
+
+		if (this._rawReadOnOpen) {
+			this.off("open", this._rawReadOnOpen);
+			this._rawReadOnOpen = null;
+		}
+
+		const c = this._rawReadController;
+		if (!c) return;
+		this._rawReadController = null;
+		try {
+			c.close();
+		} catch {
+			// 無視する。
+		}
 	}
 }

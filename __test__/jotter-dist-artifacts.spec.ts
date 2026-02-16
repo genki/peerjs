@@ -28,7 +28,7 @@ describe("distのパッチ済み成果物", () => {
 		const text = await readText("dist/serializer.msgpack.mjs");
 		expectNoSourceMapUrl(text);
 		expect(text).toMatch(
-			/_encoder=new (ee|F)\(void 0,void 0,void 0,void 0,void 0,void 0,true\)/,
+			/_encoder=new [A-Za-z0-9_$]+\(void 0,(void 0,){4}void 0,true\)/,
 		);
 	});
 });

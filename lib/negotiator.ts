@@ -1,6 +1,7 @@
 import logger from "./logger";
 import type { MediaConnection } from "./mediaconnection";
 import type { DataConnection } from "./dataconnection/DataConnection";
+import { trackPeerConnection, untrackPeerConnection } from "./rtcDebug";
 import {
 	BaseConnectionErrorType,
 	ConnectionType,
@@ -55,6 +56,7 @@ export class Negotiator<
 		const peerConnection = new RTCPeerConnection(
 			this.connection.provider.options.config,
 		);
+		trackPeerConnection(peerConnection);
 
 		this._setupListeners(peerConnection);
 
@@ -189,6 +191,7 @@ export class Negotiator<
 		if (peerConnectionNotClosed || dataChannelNotClosed) {
 			peerConnection.close();
 		}
+		untrackPeerConnection(peerConnection);
 	}
 
 	private async _makeOffer(): Promise<void> {

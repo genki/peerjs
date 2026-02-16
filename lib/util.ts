@@ -1,6 +1,10 @@
 import { BinaryPackChunker } from "./dataconnection/BufferedConnection/binaryPackChunker";
 import * as BinaryPack from "peerjs-js-binarypack";
 import { Supports } from "./supports";
+import {
+	resetRtcPeerConnectionStats,
+	rtcPeerConnectionStats,
+} from "./rtcDebug";
 import { validateId } from "./utils/validateId";
 import { randomToken } from "./utils/randomToken";
 
@@ -67,6 +71,8 @@ export class Util extends BinaryPackChunker {
 
 	pack = BinaryPack.pack;
 	unpack = BinaryPack.unpack;
+	rtcPeerConnectionStats = rtcPeerConnectionStats;
+	resetRtcPeerConnectionStats = resetRtcPeerConnectionStats;
 
 	/**
 	 * A hash of WebRTC features mapped to booleans that correspond to whether the feature is supported by the current browser.

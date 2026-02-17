@@ -672,7 +672,9 @@ export class Peer extends EventEmitterWithError<PeerErrorType, PeerEvents> {
 
 		if (!connections) return;
 
-		for (const connection of connections) {
+		// close内でprovider._removeConnectionが走り配列がspliceされるため、
+		// for...ofで直接回すと要素をスキップしてclose漏れが起き得る。
+		for (const connection of connections.slice()) {
 			connection.close();
 		}
 	}

@@ -4,7 +4,7 @@ import type { Peer } from "../../peer.js";
 
 export class MsgPack extends StreamConnection {
 	readonly serialization = "MsgPack";
-	private _encoder = new Encoder();
+	private _encoder: Encoder | null = new Encoder();
 
 	constructor(peerId: string, provider: Peer, options: any) {
 		super(peerId, provider, options);
@@ -22,6 +22,15 @@ export class MsgPack extends StreamConnection {
 	}
 
 	protected override _send(data) {
-		return this.writer.write(this._encoder.encode(data));
+		const encoder = this._encoder;
+		if (!encoder) return Promise.resolve();
+		return this.writer.write(encoder.encode(data));
+	}
+
+	public override close(options?: { flush?: boolean }): void {
+		super.close(options);
+		if (!options?.flush) {
+			this._encoder = null;
+		}
 	}
 }

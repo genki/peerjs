@@ -3,12 +3,24 @@ import type { Peer } from "../../peer.js";
 import { DataConnection } from "../DataConnection.js";
 
 export abstract class StreamConnection extends DataConnection {
+	private static readonly NOOP_WRITER =
+		{
+			write: async () => undefined,
+			close: async () => undefined,
+			abort: async () => undefined,
+			releaseLock: () => undefined,
+			desiredSize: null,
+			ready: Promise.resolve(),
+			closed: Promise.resolve(),
+		} as unknown as WritableStreamDefaultWriter<Uint8Array>;
+
 	private _CHUNK_SIZE = 1024 * 8 * 4;
 	private _bufferedAmountLowWait: Promise<void> | null = null;
 	private _rawReadController:
 		| ReadableStreamDefaultController<ArrayBuffer>
 		| null = null;
 	private _rawReadOnOpen: (() => void) | null = null;
+	private _sendPipeAbortController = new AbortController();
 	private _splitStream = new TransformStream<Uint8Array>({
 		transform: (chunk, controller) => {
 			for (let split = 0; split < chunk.length; split += this._CHUNK_SIZE) {
@@ -74,7 +86,11 @@ export abstract class StreamConnection extends DataConnection {
 	protected constructor(peerId: string, provider: Peer, options: any) {
 		super(peerId, provider, { ...options, reliable: true });
 
-		void this._splitStream.readable.pipeTo(this._rawSendStream).catch(() => {});
+		void this._splitStream.readable
+			.pipeTo(this._rawSendStream, {
+				signal: this._sendPipeAbortController.signal,
+			})
+			.catch(() => {});
 	}
 
 	private _waitForBufferedAmountLow(): Promise<void> {
@@ -83,22 +99,25 @@ export abstract class StreamConnection extends DataConnection {
 		if (!dc) return Promise.resolve();
 		this._bufferedAmountLowWait = new Promise((resolve) => {
 			let done = false;
-			const finish = () => {
-				if (done) return;
-				done = true;
-				this._bufferedAmountLowWait = null;
-				resolve();
-			};
-			const onLow = () => finish();
-			dc.addEventListener("bufferedamountlow", onLow, { once: true });
-			this.once("close", () => {
+			const cleanup = () => {
+				this.off("close", onClose);
 				try {
 					dc.removeEventListener("bufferedamountlow", onLow);
 				} catch {
 					// 無視する。
 				}
-				finish();
-			});
+			};
+			const finish = () => {
+				if (done) return;
+				done = true;
+				this._bufferedAmountLowWait = null;
+				cleanup();
+				resolve();
+			};
+			const onLow = () => finish();
+			const onClose = () => finish();
+			dc.addEventListener("bufferedamountlow", onLow, { once: true });
+			this.once("close", onClose);
 		});
 		return this._bufferedAmountLowWait;
 	}
@@ -124,10 +143,24 @@ export abstract class StreamConnection extends DataConnection {
 		}
 
 		const c = this._rawReadController;
-		if (!c) return;
-		this._rawReadController = null;
+		if (c) {
+			this._rawReadController = null;
+			try {
+				c.close();
+			} catch {
+				// 無視する。
+			}
+		}
+
+		if (!this._sendPipeAbortController.signal.aborted) {
+			this._sendPipeAbortController.abort();
+		}
+
+		const writer = this.writer;
+		this.writer = StreamConnection.NOOP_WRITER;
+		void writer.abort().catch(() => {});
 		try {
-			c.close();
+			writer.releaseLock();
 		} catch {
 			// 無視する。
 		}

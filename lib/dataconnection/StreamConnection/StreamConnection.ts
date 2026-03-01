@@ -13,6 +13,7 @@ export abstract class StreamConnection extends DataConnection {
 			ready: Promise.resolve(),
 			closed: Promise.resolve(),
 		} as unknown as WritableStreamDefaultWriter<Uint8Array>;
+	private static readonly WAIT_POLL_INTERVAL = 50;
 
 	private _CHUNK_SIZE = 1024 * 8 * 4;
 	private _bufferedAmountLowWait: Promise<void> | null = null;
@@ -97,6 +98,8 @@ export abstract class StreamConnection extends DataConnection {
 		if (this._bufferedAmountLowWait) return this._bufferedAmountLowWait;
 		const dc = this.dataChannel;
 		if (!dc) return Promise.resolve();
+		const threshold = Math.max(0, dc.bufferedAmountLowThreshold || 0);
+		if (dc.bufferedAmount <= threshold) return Promise.resolve();
 		this._bufferedAmountLowWait = new Promise((resolve) => {
 			let done = false;
 			const cleanup = () => {
@@ -106,6 +109,7 @@ export abstract class StreamConnection extends DataConnection {
 				} catch {
 					// 無視する。
 				}
+				clearInterval(pollId);
 			};
 			const finish = () => {
 				if (done) return;
@@ -116,6 +120,15 @@ export abstract class StreamConnection extends DataConnection {
 			};
 			const onLow = () => finish();
 			const onClose = () => finish();
+			const pollId = setInterval(() => {
+				const current = this.dataChannel;
+				if (!current) return finish();
+				const low = Math.max(
+					0,
+					current.bufferedAmountLowThreshold || 0,
+				);
+				if (current.bufferedAmount <= low) finish();
+			}, StreamConnection.WAIT_POLL_INTERVAL);
 			dc.addEventListener("bufferedamountlow", onLow, { once: true });
 			this.once("close", onClose);
 		});

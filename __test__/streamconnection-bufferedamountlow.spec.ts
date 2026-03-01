@@ -162,4 +162,42 @@ describe("StreamConnection bufferedamountlow", () => {
 		expect((conn as any).listenerCount("close")).toBe(0);
 		conn.close();
 	});
+
+	it("bufferedamountlow未発火でも閾値到達で待機解除する", async () => {
+		jest.useFakeTimers();
+		try {
+			// eslint-disable-next-line @typescript-eslint/no-var-requires
+			const {
+				StreamConnection,
+			} = require("../lib/dataconnection/StreamConnection/StreamConnection");
+
+			class TestConn extends StreamConnection {
+				serialization = "test";
+				constructor() {
+					super("peer", fakeProvider(), {});
+				}
+				// eslint-disable-next-line @typescript-eslint/no-unused-vars
+				protected _send(_data: any, _chunked: boolean) {}
+			}
+
+			const conn = new TestConn();
+			const dc = new FakeDataChannel();
+			// @ts-ignore
+			conn._initializeDataChannel(dc);
+			// @ts-ignore
+			dc.onopen?.();
+
+			dc.bufferedAmount = 9 * 1024 * 1024;
+			const p = (conn as any).writer.write(new Uint8Array(16));
+			await Promise.resolve();
+			dc.bufferedAmount = 0;
+			await jest.advanceTimersByTimeAsync(60);
+			await expect(p).resolves.toBeUndefined();
+			expect(dc.send).toHaveBeenCalledTimes(1);
+			expect((conn as any).listenerCount("close")).toBe(0);
+			conn.close();
+		} finally {
+			jest.useRealTimers();
+		}
+	});
 });
